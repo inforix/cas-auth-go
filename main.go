@@ -15,6 +15,7 @@ import (
 
 type myHandler struct{}
 
+// MyHandler not comment
 var MyHandler = &myHandler{}
 var casURL string
 
@@ -41,7 +42,7 @@ func main() {
 	})
 
 	server := &http.Server{
-		Addr:    ":8080",
+		Addr:    "0.0.0.0:8080",
 		Handler: client.Handle(m),
 	}
 

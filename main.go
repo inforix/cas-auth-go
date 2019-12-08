@@ -30,9 +30,11 @@ type authHandler struct{}
 var MyHandler = &myHandler{}
 
 var casURL string
+var port int
 
 func init() {
-	flag.StringVar(&casURL, "url", "", "CAS server URL")
+	flag.StringVar(&casURL, "url", "https://cas.shmtu.edu.cn/cas", "CAS server URL")
+	flag.IntVar(&port, "port", 8080, "listen port, default is 8080")
 }
 
 func main() {
@@ -57,7 +59,7 @@ func main() {
 	})
 
 	server := &http.Server{
-		Addr:    "0.0.0.0:8080",
+		Addr:    fmt.Sprintf("0.0.0.0:%d", port),
 		Handler: client.Handle(m),
 	}
 

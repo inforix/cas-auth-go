@@ -14,9 +14,11 @@ import (
 )
 
 type myHandler struct{}
+type authHandler struct{}
 
 // MyHandler not comment
 var MyHandler = &myHandler{}
+
 var casURL string
 
 func init() {
@@ -35,6 +37,7 @@ func main() {
 
 	m := http.NewServeMux()
 	m.Handle("/", MyHandler)
+	m.Handle("/auth", new(authHandler))
 
 	url, _ := url.Parse(casURL)
 	client := cas.NewClient(&cas.Options{
@@ -56,6 +59,17 @@ func main() {
 type templateBinding struct {
 	Username   string
 	Attributes cas.UserAttributes
+}
+
+func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !cas.IsAuthenticated(r) {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+
+	username := cas.Username(r)
+	w.Header().Add("X-Forwarded-User", username)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

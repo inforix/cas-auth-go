@@ -7,10 +7,18 @@ import (
 	"html/template"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/golang/glog"
+	"github.com/gorilla/securecookie"
 
 	cas "github.com/inforix/cas-client-go"
+)
+
+var (
+	nsCookieName         = "NSLOGIN"
+	nsCookieHashKey      = []byte("SECURE_COOKIE_HASH_KEY")
+	nsRedirectCookieName = "NSREDIRECT"
 )
 
 type myHandler struct{}
@@ -66,14 +74,24 @@ type templateBinding struct {
 }
 
 func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if !cas.IsAuthenticated(r) {
-		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return
+	// if !cas.IsAuthenticated(r) {
+	// 	http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+	// 	return
+	// }
+	var s = securecookie.New(nsCookieHashKey, nil)
+	// get the cookie from the request
+	if cookie, err := r.Cookie(nsCookieName); err == nil {
+		value := make(map[string]string)
+		// try to decode it
+		if err = s.Decode(nsCookieName, cookie.Value, &value); err == nil {
+			w.Header().Add("X-Forwarded-User", value["user"])
+			w.WriteHeader(http.StatusOK)
+			return
+		}
 	}
 
-	username := cas.Username(r)
-	w.Header().Add("X-Forwarded-User", username)
-	w.WriteHeader(http.StatusOK)
+	// Otherwise, return HTTP 401 status code
+	http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 }
 
 func (h *loginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -82,16 +100,50 @@ func (h *loginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	returl, ok := r.URL.Query()["returl"]
-	if ok {
-		http.Redirect(w, r, returl[0], http.StatusTemporaryRedirect)
-		return
+	var s = securecookie.New(nsCookieHashKey, nil)
+	value := map[string]string{
+		"user": cas.Username(r),
 	}
+
+	if encoded, err := s.Encode(nsCookieName, value); err == nil {
+		cookie := &http.Cookie{
+			Name:    nsCookieName,
+			Value:   encoded,
+			Domain:  ".shmtu.edu.cn",
+			Expires: time.Now().AddDate(1, 0, 0),
+			Path:    "/",
+		}
+		http.SetCookie(w, cookie)
+	}
+
+	var redirectURL = "/"
+	if cookie, err := r.Cookie(nsRedirectCookieName); err == nil {
+		redirectURL = cookie.Value
+	}
+
+	// ... and delete the original destination holder cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:    nsRedirectCookieName,
+		Value:   "deleted",
+		Domain:  ".shmtu.edu.cn",
+		Expires: time.Now().Add(time.Hour * -24),
+		Path:    "/",
+	})
+
+	http.Redirect(w, r, redirectURL, http.StatusFound)
 
 	w.Write([]byte("No return URL specified"))
 }
 
 func (h *logoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:    nsCookieName,
+		Value:   "deleted",
+		Domain:  ".shmtu.edu.cn",
+		Expires: time.Now().Add(time.Hour * -24),
+		Path:    "/",
+	})
+
 	cas.RedirectToLogout(w, r)
 }
 

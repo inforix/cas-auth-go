@@ -14,6 +14,7 @@ import (
 )
 
 type myHandler struct{}
+type loginHandler struct{}
 type authHandler struct{}
 
 // MyHandler not comment
@@ -38,6 +39,7 @@ func main() {
 	m := http.NewServeMux()
 	m.Handle("/", MyHandler)
 	m.Handle("/auth", new(authHandler))
+	m.Handle("/cas/login", new(loginHandler))
 
 	url, _ := url.Parse(casURL)
 	client := cas.NewClient(&cas.Options{
@@ -70,6 +72,21 @@ func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	username := cas.Username(r)
 	w.Header().Add("X-Forwarded-User", username)
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *loginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if !cas.IsAuthenticated(r) {
+		cas.RedirectToLogin(w, r)
+		return
+	}
+
+	returl, ok := r.URL.Query()["returl"]
+	if ok {
+		http.Redirect(w, r, returl[0], http.StatusTemporaryRedirect)
+		return
+	}
+
+	w.Write([]byte("No return URL specified"))
 }
 
 func (h *myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

@@ -15,6 +15,7 @@ import (
 
 type myHandler struct{}
 type loginHandler struct{}
+type logoutHandler struct{}
 type authHandler struct{}
 
 // MyHandler not comment
@@ -40,6 +41,7 @@ func main() {
 	m.Handle("/", MyHandler)
 	m.Handle("/auth", new(authHandler))
 	m.Handle("/cas/login", new(loginHandler))
+	m.Handle("/cas/logout", new(logoutHandler))
 
 	url, _ := url.Parse(casURL)
 	client := cas.NewClient(&cas.Options{
@@ -89,14 +91,13 @@ func (h *loginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("No return URL specified"))
 }
 
+func (h *logoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	cas.RedirectToLogout(w, r)
+}
+
 func (h *myHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !cas.IsAuthenticated(r) {
 		cas.RedirectToLogin(w, r)
-		return
-	}
-
-	if r.URL.Path == "/logout" {
-		cas.RedirectToLogout(w, r)
 		return
 	}
 

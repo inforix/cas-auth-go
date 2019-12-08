@@ -10,7 +10,7 @@ import (
 
 	"github.com/golang/glog"
 
-	"github.com/inforix/cas"
+	cas "github.com/inforix/cas-client-go"
 )
 
 type myHandler struct{}

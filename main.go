@@ -45,13 +45,13 @@ func main() {
 		return
 	}
 
-	glog.Info("Starting up")
+	glog.Info("Starting up, listen Port: ", port, " CAS: ", casURL)
 
 	m := http.NewServeMux()
 	m.Handle("/", MyHandler)
 	m.Handle("/auth", new(authHandler))
-	m.Handle("/cas/login", new(loginHandler))
-	m.Handle("/cas/logout", new(logoutHandler))
+	m.Handle("/login", new(loginHandler))
+	m.Handle("/logout", new(logoutHandler))
 
 	url, _ := url.Parse(casURL)
 	client := cas.NewClient(&cas.Options{
@@ -76,32 +76,42 @@ type templateBinding struct {
 }
 
 func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// if !cas.IsAuthenticated(r) {
-	// 	http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-	// 	return
-	// }
+	glog.Info("Enter Auth")
+	
+	if !cas.IsAuthenticated(r) {
+		glog.Info("Not Authroized, return 401")
+	        http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+	        return
+	}
 	var s = securecookie.New(nsCookieHashKey, nil)
 	// get the cookie from the request
 	if cookie, err := r.Cookie(nsCookieName); err == nil {
 		value := make(map[string]string)
 		// try to decode it
 		if err = s.Decode(nsCookieName, cookie.Value, &value); err == nil {
+			glog.Info("Decode cookie")
+			glog.Info(value["user"])
 			w.Header().Add("X-Forwarded-User", value["user"])
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 	}
 
+	glog.Info("return 401")
 	// Otherwise, return HTTP 401 status code
 	http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 }
 
 func (h *loginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	glog.Info("Enter loginHandler...")
+
 	if !cas.IsAuthenticated(r) {
+		glog.Info("Redirect to CAS Login...")
 		cas.RedirectToLogin(w, r)
 		return
 	}
 
+	glog.Info("CAS Already logged in")
 	var s = securecookie.New(nsCookieHashKey, nil)
 	value := map[string]string{
 		"user": cas.Username(r),
@@ -123,6 +133,8 @@ func (h *loginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		redirectURL = cookie.Value
 	}
 
+	glog.Info("redirectURL: ", redirectURL)
+
 	// ... and delete the original destination holder cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:    nsRedirectCookieName,
@@ -138,6 +150,8 @@ func (h *loginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *logoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	glog.Info("Enter logoutHandler...")
+
 	http.SetCookie(w, &http.Cookie{
 		Name:    nsCookieName,
 		Value:   "deleted",
@@ -146,6 +160,7 @@ func (h *logoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		Path:    "/",
 	})
 
+	glog.Info("Leaving logoutHandler.")
 	cas.RedirectToLogout(w, r)
 }
 

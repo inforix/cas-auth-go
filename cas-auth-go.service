@@ -7,7 +7,7 @@ Type=simple
 Restart=always
 RestartSec=1
 User=root
-ExecStart=/root/go/src/cas-auth-go/main -url https://cas.shmtu.edu.cn/cas
+ExecStart=/home/vpn/go/src/cas-auth-go/main -url https://cas.shmtu.edu.cn/cas
 
 [Install]
 WantedBy=multi-user.target
